@@ -2,7 +2,7 @@ import * as ts from 'typescript';
 import * as fs from 'fs';
 import * as path from 'path';
 
-export function deepImportLoader(file: string, moduleDir: string): string {
+export function deepImportLoader(file: string): string {
   let contents = fs.readFileSync(file).toString();
   const options: ts.CompilerOptions = {
     allowJs: true,
@@ -11,11 +11,11 @@ export function deepImportLoader(file: string, moduleDir: string): string {
   const program = ts.createProgram([file], options);
   const source = (program as any).getSourceFile(file);
 
-  const importPaths = findAngularImports(source, contents, moduleDir);
+  const importPaths = findAngularImports(source, contents);
   return replaceAngularImports(importPaths, contents);
 }
 
-function findAngularImports(node: ts.Node, contents: string, moduleDir:string): any[] {
+function findAngularImports(node: ts.Node, contents: string): any[] {
   const newImportPaths = [];
   ts.forEachChild(node, cb);
 
@@ -25,7 +25,7 @@ function findAngularImports(node: ts.Node, contents: string, moduleDir:string): 
       const importIdentifiers = (node.importClause.namedBindings as ts.NamedImports).elements;
       let newImportPath = '';
       Array.prototype.forEach.call(importIdentifiers, importId => {
-        newImportPath += buildNewImportString(importId, node.moduleSpecifier.text, moduleDir);
+        newImportPath += buildNewImportString(importId, node.moduleSpecifier.text);
       });
       newImportPaths.push({pos: node.pos, end: node.end, path: newImportPath});
     }
@@ -46,18 +46,19 @@ function replaceAngularImports(importPaths: any[], contents: string): string {
 }
 
 function buildNewImportString(
-    importId: ts.ImportSpecifier, shortPath: string, moduleDir: string): string {
+    importId: ts.ImportSpecifier, shortPath: string): string {
 
   // if using an import alias, symbol is stored as propertyName, otherwise stored as name
   const symbol = importId.propertyName ? importId.propertyName.text : importId.name.text;
-  const deepImportPath = findDeepImportPath(symbol, shortPath, moduleDir);
+  const deepImportPath = findDeepImportPath(symbol, shortPath);
 
   const importIdString =
       importId.propertyName ? `${symbol} as ${importId.name.text}` : symbol;
   return `\nimport { ${importIdString} } from '${deepImportPath}';\n`;
 }
 
-function findDeepImportPath(symbol: string, shortcut: string, moduleDir: string): string {
+function findDeepImportPath(symbol: string, shortcut: string): string {
+  const moduleDir = path.resolve(process.cwd(), 'node_modules');
   const importMap =
       JSON.parse(fs.readFileSync(path.resolve(moduleDir, shortcut, 'imports.json')).toString());
   return shortcut + '/' + importMap[symbol];
@@ -72,12 +73,3 @@ function isNamedImport(node: any): boolean {
       && node.importClause.namedBindings
       && node.importClause.namedBindings.kind === ts.SyntaxKind.NamedImports;
 }
-
-// export function isDeclarationNode(node: ts.Node): boolean {
-//   return node.kind === ts.SyntaxKind.VariableDeclaration ||
-//       node.kind === ts.SyntaxKind.FunctionDeclaration ||
-//       node.kind === ts.SyntaxKind.ClassDeclaration ||
-//       node.kind === ts.SyntaxKind.EnumDeclaration ||
-//       node.kind === ts.SyntaxKind.TypeAliasDeclaration ||
-//       node.kind === ts.SyntaxKind.InterfaceDeclaration;
-// }

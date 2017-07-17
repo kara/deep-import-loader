@@ -6,6 +6,6 @@ module.exports = function(content: string) {
   const tmpFile = (tmp as any).fileSync({postfix: '.js'}).name;
   console.log(`processing imports for ${this.request}`);
   fs.writeFileSync(tmpFile, content);
-  return deepImportLoader(tmpFile, this.query.moduleDir);
+  return deepImportLoader(tmpFile);
 };
 
